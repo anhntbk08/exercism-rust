@@ -1,0 +1,388 @@
+/**
+ * My original solution, look heavily and costly
+ * Take away
+ *  - 'a &str, could not instance new str and return
+ *  - 'a &str, pass reference with lifetime must return with same lifetime
+ * Question
+ *  - How to make the comparing functions shorten and cleaner
+ */
+
+use std::cmp::Ordering;
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+enum Suit {
+    Clubs,
+    Diamonds,
+    Hearts,
+    Spades,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+enum Rank {
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Ten,
+    Jack,
+    Queen,
+    King,
+    Ace,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+enum HandRank {
+    HighCard(Rank, Rank, Rank, Rank, Rank),
+    OnePair(Rank),
+    TwoPairs(Rank, Rank, Rank),
+    ThreeOfAKind(Rank, Rank),
+    Straight(Rank),
+    Flush(Suit, Rank),
+    FullHouse(Rank, Rank),
+    FourOfAKind(Rank, Rank),
+    StraightFlush(Suit, Rank),
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Card {
+    rank: Rank,
+    suit: Suit,
+}
+
+struct PokerHand {
+    cards: Vec<Card>,
+}
+
+impl HandRank {
+    fn ordinal(&self) -> usize {
+        match self {
+            HandRank::HighCard(_, _, _, _, _) => 0,
+            HandRank::OnePair(_) => 1,
+            HandRank::TwoPairs(_, _, _) => 2,
+            HandRank::ThreeOfAKind(_, _) => 3,
+            HandRank::Straight(_) => 4,
+            HandRank::Flush(_, _) => 5,
+            HandRank::FullHouse(_, _) => 6,
+            HandRank::FourOfAKind(_, _) => 7,
+            HandRank::StraightFlush(_, _) => 8,
+        }
+    }
+}
+
+impl PartialOrd for HandRank {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.ordinal() != other.ordinal() {
+            // Compare based on the hand type's strength
+            return self.ordinal().partial_cmp(&other.ordinal());
+        }
+
+        // Detailed comparison logic for hands of the same type
+        match (self, other) {
+            (HandRank::TwoPairs(a_high, a_low, a_kicker), HandRank::TwoPairs(b_high, b_low, b_kicker)) => {
+                match a_high.cmp(b_high) {
+                    Ordering::Equal => match a_low.cmp(b_low) {
+                        Ordering::Equal => a_kicker.cmp(b_kicker).into(),
+                        other => other.into(),
+                    },
+                    other => other.into(),
+                }
+            },
+            (HandRank::ThreeOfAKind(a_rank, a_kicker), HandRank::ThreeOfAKind(b_rank, b_kicker)) => {
+                match a_rank.cmp(b_rank) {
+                    Ordering::Equal => a_kicker.cmp(b_kicker).into(),
+                    other => other.into(),
+                }
+            },
+            (HandRank::Straight(a_rank), HandRank::Straight(b_rank)) => a_rank.cmp(b_rank).into(),
+            (HandRank::OnePair(a_pair), HandRank::OnePair(b_pair)) => {
+                a_pair.cmp(b_pair).into()
+            },
+            (HandRank::HighCard(a1, a2, a3, a4, a5), HandRank::HighCard(b1, b2, b3, b4, b5)) => {
+                match a1.cmp(b1) {
+                    Ordering::Equal => match a2.cmp(b2) {
+                        Ordering::Equal => match a3.cmp(b3) {
+                            Ordering::Equal => match a4.cmp(b4) {
+                                Ordering::Equal => a5.cmp(b5).into(),
+                                other => other.into(),
+                            },
+                            other => other.into(),
+                        },
+                        other => other.into(),
+                    },
+                    other => other.into(),
+                }
+            },
+            (HandRank::Flush(a_suit, a_high), HandRank::Flush(b_suit, b_high)) => {
+                match a_high.cmp(b_high) {
+                    Ordering::Equal => a_suit.cmp(b_suit).into(),
+                    other => other.into(),
+                }
+            },
+            (HandRank::FourOfAKind(a_rank, a_kicker), HandRank::FourOfAKind(b_rank, b_kicker)) => {
+                match a_rank.cmp(b_rank) {
+                    Ordering::Equal => a_kicker.cmp(b_kicker).into(),
+                    other => other.into(),
+                }
+            },
+            (HandRank::FullHouse(a_three, a_two), HandRank::FullHouse(b_three, b_two)) => {
+                match a_three.cmp(b_three) {
+                    Ordering::Equal => a_two.cmp(b_two).into(),
+                    other => other.into(),
+                }
+            },
+            (HandRank::StraightFlush(a_suit, a_high), HandRank::StraightFlush(b_suit, b_high)) => {
+                // Assuming you want to compare suits if high cards are equal
+                match a_high.cmp(b_high) {
+                    Ordering::Equal => a_suit.cmp(b_suit).into(),
+                    other => other.into(),
+                }
+            },
+            
+            _ => Some(Ordering::Equal),
+        }
+    }
+}
+
+
+impl Ord for HandRank {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+fn parse_rank(rank_char: &str) -> Rank {
+    match rank_char {
+        "2" => Rank::Two,
+        "3" => Rank::Three,
+        "4" => Rank::Four,
+        "5" => Rank::Five,
+        "6" => Rank::Six,
+        "7" => Rank::Seven,
+        "8" => Rank::Eight,
+        "9" => Rank::Nine,
+        "10" => Rank::Ten,
+        "T" | "t" => Rank::Ten,
+        "J" | "j" => Rank::Jack,
+        "Q" | "q" => Rank::Queen,
+        "K" | "k" => Rank::King,
+        "A" | "a" => Rank::Ace,
+        _ => panic!("Invalid rank character: {}", rank_char),
+    }
+}
+
+fn parse_suit(suit_char: char) -> Suit {
+    match suit_char {
+        'C' | 'c' => Suit::Clubs,
+        'D' | 'd' => Suit::Diamonds,
+        'H' | 'h' => Suit::Hearts,
+        'S' | 's' => Suit::Spades,
+        _ => panic!("Invalid suit character: {}", suit_char),
+    }
+}
+
+impl PokerHand {
+    fn new(hand_str: &str) -> PokerHand {
+        let cards = hand_str.split_whitespace().map(|card_str| {
+            let suit_str = card_str.chars().last().expect("Empty string");
+            let rank_str = &card_str[..card_str.len() - 1];
+
+            let rank = parse_rank(rank_str);
+            let suit = parse_suit(suit_str);
+            Card { rank, suit }
+        }).collect();
+
+        PokerHand {
+            cards
+        }
+    }
+
+    fn rank(&self) -> HandRank {
+        if let Some((suit,rank))  = self.is_straight_flush() {
+            HandRank::StraightFlush(suit, rank)
+        } else if let Some((rank, rank1)) = self.is_four_of_a_kind() {
+            HandRank::FourOfAKind(rank, rank1)
+        } else if let Some((rank1, rank2)) = self.is_full_house() {
+            HandRank::FullHouse(rank1, rank2)
+        } else if let Some((suit, rank)) = self.is_flush() {
+            HandRank::Flush(suit, rank)
+        } else if let Some(rank) = self.is_straight() {
+            HandRank::Straight(rank)
+        } else if let Some((rank, rank1)) = self.is_three_of_a_kind() {
+            HandRank::ThreeOfAKind(rank, rank1)
+        } else if let Some((rank1, rank2, rank3)) = self.is_two_pairs() {
+            HandRank::TwoPairs(rank1, rank2, rank3)
+        } else if let Some(rank) = self.is_one_pair() {
+            HandRank::OnePair(rank)
+        } else {
+            let (rank1, rank2, rank3, rank4, rank5) = self.high_card();
+            HandRank::HighCard(rank1, rank2, rank3, rank4, rank5)
+        }
+    }
+
+    // Checks for a flush
+    fn is_flush(&self) -> Option<(Suit, Rank)> {
+        let mut ranks: Vec<_> = self.cards.iter().map(|card| card.rank).collect();
+        ranks.sort();
+
+        let first_suit = self.cards[0].suit;
+        let is_flush = self.cards.iter().all(|card| card.suit == first_suit);
+
+        if is_flush {
+            return Some((first_suit, ranks[4]));
+        } else {
+            return None;
+        }
+    }
+
+    // Checks for a straight
+    fn is_straight(&self) -> Option<Rank> {
+        let mut ranks: Vec<_> = self.cards.iter().map(|card| card.rank).collect();
+        ranks.sort();
+        ranks.dedup();
+
+        if ranks.len() == 5 && ranks[4] as i32 - ranks[0] as i32 == 4 {
+            return Some(ranks[4]);
+        }
+
+        // Special case for Ace-low straight (A-2-3-4-5)
+        if ranks == [Rank::Two, Rank::Three, Rank::Four, Rank::Five, Rank::Ace] {
+            return Some(Rank::Five);
+        }
+
+        None
+    }
+
+    // Checks for a straight flush
+    fn is_straight_flush(&self) -> Option<(Suit, Rank)> {
+        if self.is_flush().is_some() {
+            let is_flush = self.is_flush().unwrap();
+            if self.is_straight().is_some() {
+                return Some((is_flush.0, self.is_straight().unwrap()));
+            }
+            return None
+        }
+
+        None
+    }
+
+    // Checks for four of a kind
+    fn is_four_of_a_kind(&self) -> Option<(Rank, Rank)> {
+        let mut ranks: Vec<_> = self.cards.iter().map(|card| card.rank).collect();
+        ranks.sort();
+
+        if ranks[0] == ranks[3] {
+            return Some((ranks[0], ranks[4]))
+        }
+
+        if ranks[1] == ranks[4] {
+            return Some((ranks[1], ranks[0]))
+        }
+
+        None
+    }
+
+    fn is_three_of_a_kind(&self) -> Option<(Rank, Rank)> {
+        let mut ranks: Vec<_> = self.cards.iter().map(|card| card.rank).collect();
+        ranks.sort();
+
+        for i in 0..3 {
+            if ranks[i] == ranks[i + 2] {
+                if i + 2 >= 4 {
+                    return Some((ranks[i], ranks[i - 1]));
+                }
+                
+                return Some((ranks[i], ranks[4]));
+            }
+        }
+        None
+    }
+
+    fn is_two_pairs(&self) -> Option<(Rank, Rank, Rank)> {
+        let mut ranks: Vec<_> = self.cards.iter().map(|card| card.rank).collect();
+        ranks.sort();
+
+        if ranks[0] == ranks[1] && ranks[2] == ranks[3] {
+            return Some((ranks[3], ranks[1], ranks[4]));
+        }
+
+        if ranks[1] == ranks[2] && ranks[3] == ranks[4] {
+            return Some((ranks[4], ranks[2], ranks[0]));
+        }
+
+        if ranks[0] == ranks[1] && ranks[3] == ranks[4] {
+            return Some((ranks[4], ranks[1], ranks[0]));
+        }
+
+        None
+    }
+
+    fn is_one_pair(&self) -> Option<Rank> {
+        let mut ranks: Vec<_> = self.cards.iter().map(|card| card.rank).collect();
+        ranks.sort();
+
+        for i in 0..4 {
+            if ranks[i] == ranks[i + 1] {
+                return Some(ranks[i]);
+            }
+        }
+
+        None
+    }
+
+    fn high_card(&self) -> (Rank, Rank, Rank, Rank, Rank) {
+        let mut ranks: Vec<_> = self.cards.iter().map(|card| card.rank).collect();
+        ranks.sort();
+
+
+        (ranks[4], ranks[3], ranks[2], ranks[1], ranks[0])
+    }
+
+    // Checks for a full house
+    fn is_full_house(&self) -> Option<(Rank, Rank)> {
+        let mut ranks: Vec<_> = self.cards.iter().map(|card| card.rank).collect();
+        ranks.sort();
+
+        if ranks[0] == ranks[1] && ranks[2] == ranks[4] {
+            return Some((ranks[2], ranks[0]));
+        }
+        if ranks[0] == ranks[2] && ranks[3] == ranks[4] {
+            return Some((ranks[0], ranks[4]));
+        }
+        None
+    }
+}
+
+impl PartialEq for PokerHand {
+    fn eq(&self, other: &Self) -> bool {
+        self.rank() == other.rank()
+    }
+}
+
+impl PartialOrd for PokerHand {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.rank().partial_cmp(&other.rank())
+    }
+}
+
+/// Given a list of poker hands, return a list of those hands which win.
+///
+/// Note the type signature: this function should return _the same_ reference to
+/// the winning hand(s) as were passed in, not reconstructed strings which happen to be equal.
+pub fn winning_hands<'a>(hands: &[&'a str]) -> Vec<&'a str> {
+    let mut poker_hands: Vec<(&'a str, PokerHand)> = hands.iter().map(|&h| (h, PokerHand::new(h))).collect();
+
+    // Sort by the rank of each PokerHand
+    poker_hands.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+
+    // Find the best rank
+    let best_rank = poker_hands.first().map(|(_, hand)| hand.rank()).unwrap();
+
+    // Collect and return only those hands that match the best rank
+    poker_hands.iter()
+        .filter(|(_, hand)| hand.rank() == best_rank)
+        .map(|(hand_str, _)| *hand_str)
+        .collect()
+}
